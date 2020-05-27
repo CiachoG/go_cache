@@ -27,7 +27,7 @@ func New(replicas int, fn Hash) *Map {
 		hash:     fn,
 		hashMap:  make(map[int]string),
 	}
-	if m.hash == nil { //依赖注入的方式
+	if m.hash == nil { //支持用户自定义，依赖注入的方式，默认为ChecksumIEEE
 		m.hash = crc32.ChecksumIEEE
 	}
 	return m
@@ -50,7 +50,7 @@ func (m *Map) Get(key string) string {
 	if len(m.keys) == 0 {
 		return ""
 	}
-	hash := int(m.hash([]byte(key)))
+	hash := int(m.hash([]byte(key))) //32 bit
 	idx := sort.Search(len(m.keys), func(i int) bool {
 		return m.keys[i] >= hash
 	})

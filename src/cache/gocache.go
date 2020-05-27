@@ -27,14 +27,15 @@ func (f GetterFunc) Get(key string) ([]byte, error) {
 
 //Group 缓存分组,
 type Group struct {
-	name      string //不同缓存有不同的名字
-	getter    Getter //缓存未命中时的回调
-	mainCache cache  //并发缓存
+	name      string     //不同缓存有不同的名字
+	getter    Getter     //缓存未命中时的回调
+	mainCache cache      //并发缓存
+	picker    PeerPicker //组合模式，通过一个对象管理一组客户端
 }
 
 var (
-	mu     sync.RWMutex //对groups读写进行保护
-	groups = make(map[string]*Group)
+	mu     sync.RWMutex              //对groups读写进行保护
+	groups = make(map[string]*Group) //对象池，享元模式
 )
 
 func NewGroup(name string, cacheBytes int64, getter Getter) *Group {
@@ -58,6 +59,13 @@ func GetGroup(name string) *Group {
 	return g
 }
 
+func (g *Group) RegisterPeers(picker PeerPicker) {
+	if g.picker != nil {
+		panic("RegisterPeerPicker called more than once")
+	}
+	g.picker = picker
+}
+
 //Get 从缓存中获取数据，如果不存在调用用户自定义回调函数
 func (g *Group) Get(key string) (ByteView, error) {
 	if key == "" {
@@ -69,9 +77,21 @@ func (g *Group) Get(key string) (ByteView, error) {
 	}
 	return g.load(key) //缓存不存在
 }
+
+//从远程节点获取
 func (g *Group) load(key string) (value ByteView, err error) {
+	if g.picker != nil {
+		if peer, ok := g.picker.PickPeer(key); ok {
+			if value, err := g.getFromPeer(peer, key); err == nil {
+				return value, nil
+			}
+			log.Println("[GeeCache] Failed to get from peer", err)
+		}
+	}
 	return g.getLocally(key) //分布式场景下会调用 getFromPeer 从其他节点获取
 }
+
+//回调用户自定义数据源获取数据的方法
 func (g *Group) getLocally(key string) (value ByteView, err error) {
 	bytes, err := g.getter.Get(key) //调用用户自定义数据获取的方法
 	if err != nil {
@@ -85,4 +105,12 @@ func (g *Group) getLocally(key string) (value ByteView, err error) {
 }
 func (g *Group) populateCache(key string, value ByteView) {
 	g.mainCache.add(key, value)
+}
+
+func (g *Group) getFromPeer(peer PeerGetter, key string) (ByteView, error) {
+	bytes, err := peer.Get(g.name, key)
+	if err != nil {
+		return ByteView{}, err
+	}
+	return ByteView{b: bytes}, nil
 }
