@@ -2,8 +2,6 @@
 typora-copy-images-to: assets
 ---
 
-跟着[极客兔兔](https://geektutu.com/post/geecache-day1.html)七天实现分布式缓存，笔记和心得
-
 **分布式缓存关注点**：
 
 - 资源的控制
@@ -11,7 +9,6 @@ typora-copy-images-to: assets
 - 并发
 - 分布式通信
 
-**第一天**：
 
 - 实现淘汰策略LRU算法：
 
@@ -23,7 +20,6 @@ typora-copy-images-to: assets
 
   - 代码实现：
 
-**第二天**：目标是实现单机并发缓存
 
 - 实现可存任意数据类型的只读数据结构
   - 任意: []byte
@@ -46,7 +42,7 @@ typora-copy-images-to: assets
 
   - 关于要不要实现支持多种数据源配置？不需要实现，一、数据源太多，二、扩展性不好，方案是设计回调函数。
 
-**第三天**：为单机节点搭建 HTTP Server(服务端)
+**为单机节点搭建 HTTP Server(服务端)**：
 
 - HttpPoll：实现通过URL获取Group名 ->查找group ->通过url获取key ->获取缓存值->缓存通过response body返回
 
@@ -62,7 +58,7 @@ typora-copy-images-to: assets
   - 在新增或者减少节点时只需重新定位相对应节点附近的一部分数据而已
   - 节点或者机器太少时可能造成的数据倾斜问题：一个真实节点对应多个虚拟节点
 
-**第五天**：
+**助一致性哈希算法选择节点**：
 
 - 借助一致性哈希算法选择节点
 
