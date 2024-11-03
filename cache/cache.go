@@ -6,11 +6,11 @@
 package cache
 
 import (
-	"cache/lru"
+	"go_cache/cache/lru"
 	"sync"
 )
 
-//实例化lru，添加互斥锁mu
+// 实例化lru，添加互斥锁mu
 type cache struct {
 	mu         sync.Mutex
 	lru        *lru.Cache
