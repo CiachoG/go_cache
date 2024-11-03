@@ -7,6 +7,7 @@ package cache
 
 import (
 	"fmt"
+	"go_cache/cache/singleflight"
 	"log"
 	"sync"
 )
@@ -25,12 +26,13 @@ func (f GetterFunc) Get(key string) ([]byte, error) {
 	return f(key)
 }
 
-//Group 缓存分组,
+// Group 缓存分组,
 type Group struct {
-	name      string     //不同缓存有不同的名字
-	getter    Getter     //缓存未命中时的回调
-	mainCache cache      //并发缓存
-	picker    PeerPicker //组合模式，通过一个对象管理一组客户端
+	name      string              //不同缓存有不同的名字
+	getter    Getter              //缓存未命中时的回调
+	mainCache cache               //并发缓存
+	picker    PeerPicker          //组合模式，通过一个对象管理一组客户端
+	loader    *singleflight.Group //防止缓存击穿
 }
 
 var (
@@ -48,6 +50,7 @@ func NewGroup(name string, cacheBytes int64, getter Getter) *Group {
 		name:      name,
 		getter:    getter,
 		mainCache: cache{cacheBytes: cacheBytes},
+		loader:    &singleflight.Group{},
 	}
 	groups[name] = g
 	return g
@@ -66,7 +69,7 @@ func (g *Group) RegisterPeers(picker PeerPicker) {
 	g.picker = picker
 }
 
-//Get 从缓存中获取数据，如果不存在调用用户自定义回调函数
+// Get 从缓存中获取数据，如果不存在调用用户自定义回调函数
 func (g *Group) Get(key string) (ByteView, error) {
 	if key == "" {
 		return ByteView{}, fmt.Errorf("key is required")
@@ -78,20 +81,26 @@ func (g *Group) Get(key string) (ByteView, error) {
 	return g.load(key) //缓存不存在
 }
 
-//从远程节点获取
+// 从远程节点获取
 func (g *Group) load(key string) (value ByteView, err error) {
-	if g.picker != nil {
-		if peer, ok := g.picker.PickPeer(key); ok {
-			if value, err := g.getFromPeer(peer, key); err == nil {
-				return value, nil
+	viewi, err := g.loader.Do(key, func() (any, error) {
+		if g.picker != nil {
+			if peer, ok := g.picker.PickPeer(key); ok {
+				if value, err := g.getFromPeer(peer, key); err == nil {
+					return value, nil
+				}
+				log.Println("[GeeCache] Failed to get from peer", err)
 			}
-			log.Println("[GeeCache] Failed to get from peer", err)
 		}
+		return g.getLocally(key) //分布式场景下会调用 getFromPeer 从其他节点获取
+	})
+	if viewi != nil {
+		return viewi.(ByteView), nil
 	}
-	return g.getLocally(key) //分布式场景下会调用 getFromPeer 从其他节点获取
+	return
 }
 
-//回调用户自定义数据源获取数据的方法
+// 回调用户自定义数据源获取数据的方法
 func (g *Group) getLocally(key string) (value ByteView, err error) {
 	bytes, err := g.getter.Get(key) //调用用户自定义数据获取的方法
 	if err != nil {

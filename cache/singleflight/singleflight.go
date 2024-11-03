@@ -16,7 +16,7 @@ type call struct {
 	dup bool           //是否有重复请求
 }
 
-func (g *Group) Do(key string, fn func() (any, error)) (any, error, bool) {
+func (g *Group) Do(key string, fn func() (any, error)) (any, error) {
 	g.mu.Lock()
 	if g.m == nil {
 		g.m = make(map[string]*call)
@@ -25,7 +25,7 @@ func (g *Group) Do(key string, fn func() (any, error)) (any, error, bool) {
 		c.dup = true
 		g.mu.Unlock()
 		c.wg.Wait()
-		return c.val, c.err, c.dup
+		return c.val, c.err
 	}
 	c := new(call)
 	c.wg.Add(1)
@@ -33,7 +33,7 @@ func (g *Group) Do(key string, fn func() (any, error)) (any, error, bool) {
 	g.mu.Unlock()
 
 	g.doCall(c, key, fn)
-	return c.val, c.err, c.dup
+	return c.val, c.err
 }
 func (g *Group) doCall(c *call, key string, fn func() (any, error)) {
 	c.val, c.err = fn()

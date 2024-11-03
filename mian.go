@@ -6,9 +6,9 @@
 package main
 
 import (
-	"cache"
 	"flag"
 	"fmt"
+	"go_cache/cache"
 	"log"
 	"net/http"
 )

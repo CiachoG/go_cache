@@ -11,7 +11,7 @@ import (
 // TestDo 测试 Do 方法的各种场景。
 func TestDo(t *testing.T) {
 	var g Group
-	v, err, _ := g.Do("key", func() (any, error) {
+	v, err := g.Do("key", func() (any, error) {
 		return "val", nil
 	})
 	if got, want := fmt.Sprintf("%v (%T)", v, v), "val (string)"; got != want {
@@ -34,7 +34,7 @@ func TestDupDo(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func() {
-			v, err, _ := g.Do("key", fn)
+			v, err := g.Do("key", fn)
 			if err != nil {
 				t.Errorf("Do error: %v", err)
 			}
